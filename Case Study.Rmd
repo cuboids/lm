@@ -1,0 +1,193 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+theme_set(theme_light())
+```
+
+
+```{r}
+tuesdata <- tidytuesdayR::tt_load('2020-09-22')
+```
+```{r}
+?fct_reorder
+```
+
+
+```{r}
+# Name each of the three datasets
+peaks <- tuesdata$peaks
+members <- tuesdata$members
+expeditions <- tuesdata$expeditions
+
+# Add extra columns to expeditions
+
+expeditions$staff_share = expeditions$hired_staff/(expeditions$members + expeditions$hired_staff)
+expeditions$staff_share_laplace = (expeditions$hired_staff + 1)/(expeditions$members + expeditions$hired_staff + 2)
+
+mixed_gender <- logical(nrow(expeditions))
+for (i in 1:nrow(expeditions)) {
+  mixed_gender[[i]] <- members[members$expedition_id == expeditions$expedition_id[[i]], ] %>%
+    filter(hired == "FALSE") %>%
+    .$sex %>%
+    .[!is.na(.)] %>%
+    unique() %>%
+    length() %>%
+    if (. == 2) TRUE else if (. != 1) NA
+}; rm(i)
+
+mixed_citizenship <- logical(nrow(expeditions))
+for (i in 1:nrow(expeditions)) {
+  mixed_citizenship[[i]] <- members[members$expedition_id == expeditions$expedition_id[[i]], ] %>%
+    filter(hired == "FALSE") %>%
+    .$citizenship %>%
+    .[!is.na(.)] %>%
+    unique() %>%
+    length() %>%
+    if (. >=2 ) TRUE
+}; rm(i)
+
+expeditions$mixed_gender <- mixed_gender
+expeditions$mixed_citizenship <- mixed_citizenship 
+
+members[members$expedition_id == expeditions$expedition_id[[1001]], ]$citizenship %>%
+    .[!is.na(.)] %>%
+    unique()
+
+expeditions
+
+# A bit of data exploration
+peaks %>%
+  arrange(desc(height_metres)) %>%
+  head(15) %>%
+  mutate(peak_name = fct_reorder(peak_name, height_metres)) %>%
+  ggplot(aes(height_metres, peak_name, fill = climbing_status)) +
+  geom_col() +
+  labs(x = "Height (meters)",
+       y = "",
+       title = "Tallest Himalayan Peaks")
+
+expeditions %>%
+  group_by(peak_name) %>%
+  summarize(n_climbs = n(),
+            across(members:hired_staff_deaths, sum),
+            first_climb = min(year)) %>%
+  arrange(desc(n_climbs)) %>%
+  head(11) %>%
+  ggplot(aes(peak_name, n_climbs)) +
+  geom_col()
+
+expeditions[expeditions$peak_name == "Kangchenjunga", ]
+```
+
+
+```{r}
+# Let's try to fit a linear model for Kangchenjunga
+
+expeditions %>%
+  filter(peak_name == "Kangchenjunga") %>%
+  mutate(termination_reason = factor(termination_reason)) %>%
+  group_by(termination_reason) %>%
+  tally() %>%
+  arrange(desc(n))
+
+expeditions %>%
+  filter(peak_name == "Kangchenjunga") %>%
+  filter(year >= 1990)
+
+members[members$expedition_id == "KANG91102", ]
+
+# Make a LM suitable tibble for Kangchenjunga
+
+df <- members %>% left_join(expeditions, by = "expedition_id")
+
+kangchenjunga <- df %>%
+  add_column(leader_or_climber = (grepl("Leader", df$expedition_role, TRUE) |
+                                  grepl("Climber", df$expedition_role, TRUE)),
+             staff_share = df$hired_staff/(df$members + df$hired_staff),
+             staff_share_laplace = (df$hired_staff + 1)/(df$members + df$hired_staff + 2)
+             mixed_gender = ) %>%
+  
+  filter(peak_name.x == "Kangchenjunga",
+         year.x >= 1990,
+         hired == "FALSE") %>%
+  select(died,
+         success,
+         expedition_id,
+         member_id,
+         year.x,
+         season.x,
+         sex,
+         age,
+         expedition_role,
+         leader_or_climber,
+         solo,
+         oxygen_used.x,
+         staff_share_laplace)
+kangchenjunga
+
+expeditions[expeditions$expedition_id == members$expedition_id, ]
+length(members$expedition_id)
+length(expeditions$expedition_id)
+
+left_join(members, expeditions, by = "expedition_id")
+
+df[df$expedition_id == "KANG90101", ]$sex %>% unique() %>% length()
+
+df
+
+```
+
+
+```{r}
+expeditions %>%
+  group_by(year) %>%
+  filter(year > 1945) %>%
+  summarise(fatality_rate = round(sum(member_deaths)/sum(members), 2)) %>%
+  ggplot(aes(x = year, y = fatality_rate)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+expeditions %>%
+  group_by(year) %>%
+  filter(year > 1945) %>%
+  summarise(fatality_rate = round(sum(hired_staff_deaths)/sum(hired_staff), 2)) %>%
+  ggplot(aes(x = year, y = fatality_rate)) +
+  geom_point() +
+  geom_smooth()
+```
+
+```{r}
+members %>%
+  group_by(injury_type) %>%
+  summarise(mean(injury_height_metres, na.rm = TRUE))
+```
+```{r}
+mountain <- factor(members$peak_id)
+oxygen <- factor(members$oxygen_used)
+x <- glm(data = members, died ~ oxygen + mountain, family = "binomial")
+
+summary(x)
+members$injury_type.
+```
+
+
+```{r}
+x <- expeditions %>%
+  group_by(peak_name) %>%
+  tally()
+
+x[[2]][order(x$n, decreasing = TRUE)]
+x[[1]][order(x$n, decreasing = TRUE)]
+```
+```{r}
+str(expeditions)
+```
+
