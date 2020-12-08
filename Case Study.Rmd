@@ -14,19 +14,17 @@ theme_set(theme_light())
 ```{r}
 tuesdata <- tidytuesdayR::tt_load('2020-09-22')
 ```
-```{r}
-?fct_reorder
-```
 
 
 ```{r}
-# Name each of the three datasets
 peaks <- tuesdata$peaks
 members <- tuesdata$members
 expeditions <- tuesdata$expeditions
+```
 
-# Add extra columns to expeditions
+We'll define a couple more variables we can use in the logit models.
 
+```{r}
 expeditions$staff_share = expeditions$hired_staff/(expeditions$members + expeditions$hired_staff)
 expeditions$staff_share_laplace = (expeditions$hired_staff + 1)/(expeditions$members + expeditions$hired_staff + 2)
 
@@ -53,15 +51,41 @@ for (i in 1:nrow(expeditions)) {
 }; rm(i)
 
 expeditions$mixed_gender <- mixed_gender
-expeditions$mixed_citizenship <- mixed_citizenship 
+expeditions$mixed_citizenship <- mixed_citizenship
 
-members[members$expedition_id == expeditions$expedition_id[[1001]], ]$citizenship %>%
-    .[!is.na(.)] %>%
-    unique()
+# We need to rearrange expeditions to add n_previous_ascends.
+expeditions <- expeditions %>%
+  arrange(year, peak_id) %>%
+  group_by(peak_id)
 
-expeditions
+expeditions$n_previous_ascends <- rep(0, times = nrow(expeditions))
 
-# A bit of data exploration
+for (i in 1:nrow(expeditions)) {
+  if (expeditions$termination_reason[[i]] == "Success (main peak)") {
+    peak_id = expeditions$peak_id[[i]]
+    for (j in i:nrow(expeditions)) {
+      if (expeditions$peak_id[[j]] == peak_id) {
+        expeditions$n_previous_ascends[[j]] = expeditions$n_previous_ascends[[j]] + 1
+      }
+    }
+    if (i %% 100 == 0) print(paste(round(i/100), "%"))
+  }
+}; rm(i, j)
+
+expeditions <- expeditions %>% left_join(select(peaks, height_metres, peak_id), 
+                          by = "peak_id", copy = TRUE)
+
+expeditions$base2high <- expeditions$highpoint_date - expeditions$basecamp_date
+
+# Check if columns have been defined correctly.
+(colnames(expeditions)[17:23] == c("staff_share", "staff_share_laplace", "mixed_gender",
+                                  "mixed_citizenship", "n_previous_ascends", "base2high",
+                                  "height_metres")) %>% all()
+```
+
+Data exploration based on the Tidy Tuesday screencast (https://youtu.be/WT7FMn-_jPY)
+
+```{r}
 peaks %>%
   arrange(desc(height_metres)) %>%
   head(15) %>%
@@ -81,13 +105,11 @@ expeditions %>%
   head(11) %>%
   ggplot(aes(peak_name, n_climbs)) +
   geom_col()
-
-expeditions[expeditions$peak_name == "Kangchenjunga", ]
 ```
-
+Let's try to fit a linear model for Kangchenjunga
 
 ```{r}
-# Let's try to fit a linear model for Kangchenjunga
+expeditions[expeditions$peak_name == "Kangchenjunga", ]
 
 expeditions %>%
   filter(peak_name == "Kangchenjunga") %>%
@@ -104,45 +126,25 @@ members[members$expedition_id == "KANG91102", ]
 
 # Make a LM suitable tibble for Kangchenjunga
 
-df <- members %>% left_join(expeditions, by = "expedition_id")
-
-kangchenjunga <- df %>%
-  add_column(leader_or_climber = (grepl("Leader", df$expedition_role, TRUE) |
-                                  grepl("Climber", df$expedition_role, TRUE)),
-             staff_share = df$hired_staff/(df$members + df$hired_staff),
-             staff_share_laplace = (df$hired_staff + 1)/(df$members + df$hired_staff + 2)
-             mixed_gender = ) %>%
-  
-  filter(peak_name.x == "Kangchenjunga",
-         year.x >= 1990,
+kangchenjunga <- members %>%
+  left_join(expeditions, by = c("peak_id", "expedition_id", "year", "season", "peak_name"), 
+            suffix = c(".m", ".e")) %>%
+  add_column(., leader_or_climber = (grepl("Leader", .$expedition_role, TRUE) |
+                                     grepl("Climber", .$expedition_role, TRUE))) %>%
+  filter(peak_name == "Kangchenjunga",
+         year >= 1990,
          hired == "FALSE") %>%
-  select(died,
-         success,
-         expedition_id,
-         member_id,
-         year.x,
-         season.x,
-         sex,
-         age,
-         expedition_role,
-         leader_or_climber,
-         solo,
-         oxygen_used.x,
-         staff_share_laplace)
-kangchenjunga
+  select(died, success, expedition_id, member_id, year, season, sex, age, expedition_role,
+         leader_or_climber, solo, oxygen_used.m, staff_share_laplace, mixed_gender,
+         mixed_citizenship, n_previous_ascends, base2high, height_metres)
 
-expeditions[expeditions$expedition_id == members$expedition_id, ]
-length(members$expedition_id)
-length(expeditions$expedition_id)
-
-left_join(members, expeditions, by = "expedition_id")
-
-df[df$expedition_id == "KANG90101", ]$sex %>% unique() %>% length()
-
-df
+kangchenjunga %>% filter(leader_or_climber == TRUE)
 
 ```
 
+
+No clue what's below! Haha
+---------------------------------------------------------------------------------------
 
 ```{r}
 expeditions %>%
