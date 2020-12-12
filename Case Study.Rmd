@@ -7,7 +7,6 @@ output: html_notebook
 library(tidyverse)
 library(tidytuesdayR)
 library(scales)
-theme_set(theme_light())
 ```
 
 
@@ -55,8 +54,7 @@ expeditions$mixed_citizenship <- mixed_citizenship
 
 # We need to rearrange expeditions to add n_previous_ascends.
 expeditions <- expeditions %>%
-  arrange(year, peak_id) %>%
-  group_by(peak_id)
+  arrange(year, peak_id)
 
 expeditions$n_previous_ascends <- rep(0, times = nrow(expeditions))
 
@@ -81,7 +79,26 @@ expeditions$base2high <- expeditions$highpoint_date - expeditions$basecamp_date
 (colnames(expeditions)[17:23] == c("staff_share", "staff_share_laplace", "mixed_gender",
                                   "mixed_citizenship", "n_previous_ascends", "base2high",
                                   "height_metres")) %>% all()
+
+expeditions
 ```
+
+```{r}
+saveRDS(expeditions, file = "expeditions.rds")
+saveRDS(members, file = "members.rds")
+saveRDS(peaks, file = "peaks.rds")
+```
+
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+
+expeditions = readRDS(file = "expeditions.rds")
+members = readRDS(file = "members.rds")
+peaks = readRDS(file = "peaks.rds")
+```
+
 
 Data exploration based on the Tidy Tuesday screencast (https://youtu.be/WT7FMn-_jPY)
 
@@ -105,8 +122,14 @@ expeditions %>%
   head(11) %>%
   ggplot(aes(peak_name, n_climbs)) +
   geom_col()
+
+members %>%
+  group_by(peak_id) %>%
+  summarize(n_climbs = n()) %>%
+  arrange(desc(n_climbs))
 ```
-Let's try to fit a linear model for Kangchenjunga
+
+Some information about Kangchenjunga
 
 ```{r}
 expeditions[expeditions$peak_name == "Kangchenjunga", ]
@@ -124,22 +147,63 @@ expeditions %>%
 
 members[members$expedition_id == "KANG91102", ]
 
-# Make a LM suitable tibble for Kangchenjunga
+```
 
-kangchenjunga <- members %>%
-  left_join(expeditions, by = c("peak_id", "expedition_id", "year", "season", "peak_name"), 
+Make a tibble with our variables for a list of peaks.
+
+```{r}
+
+build_df <- function(peak_ids) {
+  fi <- TRUE # First iteration
+  for (id in peak_ids) {
+    peak <- members %>%
+      left_join(expeditions, by = c("expedition_id"), 
+                suffix = c(".m", ".e")) %>%
+      add_column(., leader_or_climber = (grepl("Leader", .$expedition_role, TRUE) |
+                                         grepl("Climber", .$expedition_role, TRUE))) %>%
+      filter(peak_id.m == id,
+             year.m >= 1990) %>%
+      select(peak_id.m, died, success, expedition_id, member_id, year.m, season.m, sex, age, expedition_role,
+             hired, leader_or_climber, solo, oxygen_used.m, staff_share_laplace, mixed_gender, mixed_citizenship,
+             n_previous_ascends, base2high, height_metres)
+    
+    if (fi) df <- peak else df <- df %>% add_row(peak)
+    if (fi) fi <- FALSE
+  }; rm(fi)
+  return(df)
+} 
+
+```
+
+
+```{r}
+
+df <- build_df(c("EVER", "CHOY", "AMAD", "MANA", "DHA1", "MAKA", "LHOT", "BARU", "PUMO", "ANN1", "KANG", "HIML"))
+saveRDS(df, "df.rds")
+
+```
+
+```{r}
+peak <- members %>%
+  left_join(expeditions, by = c("peak_id"), 
             suffix = c(".m", ".e")) %>%
   add_column(., leader_or_climber = (grepl("Leader", .$expedition_role, TRUE) |
                                      grepl("Climber", .$expedition_role, TRUE))) %>%
-  filter(peak_name == "Kangchenjunga",
+  filter(peak_id == "KANG",
          year >= 1990,
          hired == "FALSE") %>%
-  select(died, success, expedition_id, member_id, year, season, sex, age, expedition_role,
+  select(peak_id, died, success, expedition_id, member_id, year, season, sex, age, expedition_role,
          leader_or_climber, solo, oxygen_used.m, staff_share_laplace, mixed_gender,
          mixed_citizenship, n_previous_ascends, base2high, height_metres)
 
-kangchenjunga %>% filter(leader_or_climber == TRUE)
 
+left_join(members, expeditions, by = "peak_id") 
+expeditions['peak_id']
+
+
+
+str(members)
+str(expeditions)
 ```
 
 
@@ -191,5 +255,12 @@ x[[1]][order(x$n, decreasing = TRUE)]
 ```
 ```{r}
 str(expeditions)
+```
+
+```{r}
+library(dplyr)
+example("left_join")
+
+"tidyverse"
 ```
 
