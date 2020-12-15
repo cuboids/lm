@@ -1,0 +1,75 @@
+---
+title: "R Notebook"
+output: html_notebook
+editor_options: 
+  chunk_output_type: console
+---
+
+```{r}
+library(tidyverse)
+library(tidytuesdayR)
+library(scales)
+library(GGally)
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+members <- readRDS(file = "original_df.rds")
+```
+
+First we shall select the subset of data that we want to use, i.e. filter out certain years and peaks 
+
+```{r}
+#Summary table for peaks with their death rates
+Peak_summary <- members %>% 
+  group_by(peak_id) %>%
+  summarise(climbs = n(), death_rate = sum(died)) %>%
+  arrange(climbs %>% desc()) 
+
+Avg_Death_Rate <- sum(members$died) / nrow(members) #all peaks combined
+AB_line_df_x <- head(c(1:9 %o% 10^(0:4)), -6) #remove last 6 for graphing purposes
+AB_line_df_y <- head(c(1:9 %o% 10^(0:4)), -6) * Avg_Death_Rate
+
+
+#Plot of Death vs number of climbs for the different peak
+ggplot() + 
+  geom_point(data = Peak_summary, aes(x = climbs, y = death_rate), alpha = 0.3) +
+  geom_line(aes(x = AB_line_df_x, y = AB_line_df_y)) +
+  geom_vline(xintercept = 1000, color = "red", linetype = "dotted") +
+  scale_x_log10() +
+  scale_y_continuous(trans=scales::pseudo_log_trans(base = 10)) + 
+  xlab("Number of Climbs") +
+  ylab("Deaths")
+
+Peak_Id_subset <- Peak_summary$peak_id[Peak_summary$climbs >= 1000] #subset used, arbitrary set to 1000
+
+filter1_members <- members %>%
+  filter(peak_id %in% Peak_Id_subset)
+
+```
+
+
+
+```{r}
+#Summary table for death rate changes over time
+Year_Summary <- filter1_members %>%
+  filter(year > 1950) %>% #apart from 1957 have every year post 1950, whereas pre-1950 there are considerably gaps
+  group_by(year) %>%
+  summarise(climbs = n(), death_rate = sum(died)/climbs)
+
+#Plot of Death Rate vs year
+ggplot(data = Year_Summary, aes(x = year, y = death_rate)) +
+  geom_line() +
+  #geom_smooth(size = .4, se = FALSE) + 
+  geom_vline(xintercept = 1990, color = "red", linetype = "dotted") +
+  xlab("Year") +
+  ylab("Death Rate")
+
+
+filtered_members <- filter1_members %>%
+  filter(year >= 1990)
+#add legend
+#cross check selected and first climbs 
+```
