@@ -12,9 +12,41 @@ library(scales)
 library(GGally)
 library(dplyr)
 library(ggplot2)
+library(grid)
+library(gridExtra)
+library(corrplot)
 ```
 
 
 ```{r}
 df <- readRDS(file = "df.rds")
+df$base2high <- as.numeric(df$base2high)
+```
+
+Start by separating out quantitative and qualitative variables
+
+```{r}
+
+all_vars <- names(df)
+quant_vars <- c("year.m", "age", "staff_share_laplace", "n_previous_ascends", "base2high", "height_metres", "members")
+qual_vars <- c("season", "sex", "hired", "leader_or_climber", "solo", "oxygen_used", "mixed_gender", "mixed_citizenship")
+
+quant_df <- as.data.frame(df[, quant_vars])
+qual_df <- as.data.frame(df[, c(qual_vars, "died")])
+#for(i in 1:ncol(qual_df)){
+#  qual_df[, i] <- as.factor(qual_df[, i])
+#}
+x <- x[[]]
+for(i in 1:length(qual_vars)){
+  x[[i]] <- ggplot(qual_df, aes_string(x=qual_vars[i])) +geom_bar() + theme(axis.title.y = element_blank())
+}
+grid.arrange(x[[1]], x[[2]], x[[3]], x[[4]], x[[5]], x[[6]], x[[7]],x[[8]], ncol=4,
+             left = textGrob("Count", rot = 90, vjust = 1))
+  
+par(mfrow = c(2,4))
+for(i in 1:ncol(quant_df)){
+  plot(density(quant_df[, i], na.rm = TRUE),  main = quant_vars[i])
+}
+
+corrplot(cor(na.exclude(df[, c(quant_vars)])), method = "number")
 ```
