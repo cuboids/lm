@@ -12,6 +12,8 @@ library(scales)
 library(GGally)
 library(dplyr)
 library(ggplot2)
+library(grid)
+library(gridExtra)
 ```
 
 
@@ -58,16 +60,24 @@ filter1_members <- members %>%
 Year_Summary <- filter1_members %>%
   filter(year > 1950) %>% #apart from 1957 have every year post 1950, whereas pre-1950 there are considerably gaps
   group_by(year) %>%
-  summarise(climbs = n(), death_rate = sum(died)/climbs)
+  summarise(climbs = n(), death_rate = sum(died)/climbs) 
+
 
 #Plot of Death Rate vs year
-ggplot(data = Year_Summary, aes(x = year, y = death_rate)) +
+ggplot(data = Year_Summary, aes(x = year, y = death_rate *100)) +
   geom_point() +
   geom_smooth(size = .4, se = FALSE) + 
   geom_vline(xintercept = 1990, color = "red", linetype = "dotted") +
   xlab("Year") +
-  ylab("Death Rate")
+  ylab("Death Rate %")
 
+# p2 <- ggplot(data = Year_Summary, aes(x = year, y = climbs)) +
+#   geom_point() +
+#   geom_smooth(size = .4, se = FALSE)   })
+#   geom_vline(xintercept = 1990, color = "red", linetype = "dotted") +
+#   theme(axis.title.y = element_blank())
+
+# grid.arrange(p1, p2, ncol = 2)
 
 filtered_members <- filter1_members %>%
   filter(year >= 1990)
