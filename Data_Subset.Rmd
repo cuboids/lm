@@ -39,7 +39,8 @@ ggplot() +
   geom_line(aes(x = AB_line_df_x, y = AB_line_df_y)) +
   geom_vline(xintercept = 1000, color = "red", linetype = "dotted") +
   scale_x_log10() +
-  scale_y_continuous(trans=scales::pseudo_log_trans(base = 10)) + 
+  scale_y_continuous(trans=scales::pseudo_log_trans(base = 10), 
+                     breaks = c(0, 10, 25, 50, 100, 250, 500)) + 
   xlab("Number of Climbs") +
   ylab("Deaths")
 
@@ -61,8 +62,8 @@ Year_Summary <- filter1_members %>%
 
 #Plot of Death Rate vs year
 ggplot(data = Year_Summary, aes(x = year, y = death_rate)) +
-  geom_line() +
-  #geom_smooth(size = .4, se = FALSE) + 
+  geom_point() +
+  geom_smooth(size = .4, se = FALSE) + 
   geom_vline(xintercept = 1990, color = "red", linetype = "dotted") +
   xlab("Year") +
   ylab("Death Rate")
